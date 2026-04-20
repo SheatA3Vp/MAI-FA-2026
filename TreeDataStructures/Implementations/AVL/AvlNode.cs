@@ -5,5 +5,6 @@ namespace TreeDataStructures.Implementations.AVL;
 public class AvlNode<TKey, TValue>(TKey key, TValue value)
     : Node<TKey, TValue, AvlNode<TKey, TValue>>(key, value)
 {
-    public int Height { get; set; } = 1;
+    // Разница между высотами правого и левого поддеревьев
+    public int Diff { get; set; } = 0;
 }
