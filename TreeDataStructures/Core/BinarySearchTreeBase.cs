@@ -51,7 +51,6 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
             if (cmp < 0) current = current.Left;
             else if (cmp > 0) current = current.Right;
             // При дублировании ключа изменяем значение в ноде на новое
-            // Запускать OnNodeAdded()? Создать хук OnNodeUpdated()?
             else {
                 current.Value = value;
                 return;
@@ -80,44 +79,52 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
     
     protected virtual void RemoveNode(TNode node)
     {
-        TNode? current = null;
+        TNode? replacementParent = null;
+        TNode? replacementChild = null;
 
         if (node.Left == null && node.Right == null) {
+            replacementParent = node.Parent;
+            replacementChild = null;
             Transplant(node, null);
-            OnNodeRemoved(node.Parent, null);
-            return;
         }
-
         else if (node.Left == null && node.Right != null) {
-            current = node.Right;
-            Transplant(node, current);
+            replacementParent = node.Parent;
+            replacementChild = node.Right;
+            Transplant(node, node.Right);
         }
-
         else if (node.Left != null && node.Right == null) {
-            current = node.Left;
-            Transplant(node, current);
+            replacementParent = node.Parent;
+            replacementChild = node.Left;
+            Transplant(node, node.Left);
         }
-
-        // Добавить Transplant
         else {
-            current = node.Right;
+            TNode current = node.Right!;  // "!" говорит, что значение точно не null
             while (current.Left != null) {
                 current = current.Left;
             }
 
             if (current.Parent != node) {
+                replacementParent = current.Parent;
+                replacementChild = current.Right;
                 Transplant(current, current.Right);
                 current.Right = node.Right;
                 if (current.Right != null) current.Right.Parent = current;
+            } else {
+                replacementParent = current;
+                replacementChild = current.Right;
             }
 
             Transplant(node, current);
             current.Left = node.Left;
             if (current.Left != null) current.Left.Parent = current;
+            
+            OnNodeReplaced(node, current);
         }
 
-        OnNodeRemoved(current.Parent, current);
+        OnNodeRemoved(replacementParent, replacementChild);
     }
+
+    protected virtual void OnNodeReplaced(TNode oldNode, TNode newNode) { }
 
     public virtual bool ContainsKey(TKey key) => FindNode(key) != null;
     
@@ -162,7 +169,7 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
     protected abstract TNode CreateNode(TKey key, TValue value);
     
     
-    protected TNode? FindNode(TKey key)
+    protected virtual TNode? FindNode(TKey key)
     {
         TNode? current = Root;
         while (current != null)
@@ -402,6 +409,8 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
                 _currentEntry = null;
                 return false;
             }
+
+            // TODO: Переделать реверс-обходы
 
             switch (_strategy){
                 case TraversalStrategy.InOrder:  // left -> root -> right
